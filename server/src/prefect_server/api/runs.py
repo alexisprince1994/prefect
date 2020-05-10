@@ -229,16 +229,12 @@ async def get_runs_in_queue(
         limit=config.queued_runs_returned_limit * 4,
     )
 
-    print(f"Flow runs are: {flow_runs}")
-
     # See if any flows are resource constrained and find current available resources
     concurrency_limits = set()
     for flow_run in flow_runs:
         flow_concurrency_limits = flow_run.flow.environment.get("labels") or []
         for flow_concurrency_limit in flow_concurrency_limits:
             concurrency_limits.add(flow_concurrency_limit)
-
-    print(f"env execution labels are: {concurrency_limits}")
 
     # Some environments may be tagged w/ labels but _not_ have
     # limits associated with them, so we check for all of them
@@ -248,8 +244,6 @@ async def get_runs_in_queue(
     available_concurrency_slots = await api.concurrency_limits.get_available_flow_concurrency(
         list(concurrency_limits)
     )
-    print(f"Available concurrency slots are: {available_concurrency_slots}")
-    print(f"Return limit is: {config.queued_runs_returned_limit}")
 
     counter = 0
     final_flow_runs = []
@@ -303,7 +297,5 @@ async def get_runs_in_queue(
 
         final_flow_runs.append(flow_run.id)
         counter += 1
-
-    print(f"Final flow runs are: {final_flow_runs}")
 
     return final_flow_runs
