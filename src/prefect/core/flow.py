@@ -1,4 +1,5 @@
 import collections
+import collections.abc
 import copy
 import functools
 import inspect
@@ -31,6 +32,7 @@ import prefect.schedules
 from prefect.core.edge import Edge
 from prefect.core.task import Parameter, Task
 from prefect.engine.result import NoResult, Result
+from prefect.engine.results import ResultHandlerResult
 from prefect.engine.result_handlers import ResultHandler
 from prefect.environments import Environment
 from prefect.environments.storage import Storage, get_default_storage_class
@@ -154,11 +156,19 @@ class Flow:
             raise ValueError("A name must be provided for the flow.")
 
         self.name = name
-        self.logger = logging.get_logger("Flow: {}".format(self.name))
+        self.logger = logging.get_logger(self.name)
         self.schedule = schedule
         self.environment = environment or prefect.environments.RemoteEnvironment()
         self.storage = storage
-        self.result_handler = result_handler
+        if result_handler:
+            warnings.warn(
+                "Result Handlers are deprecated; please use the new style Result classes instead."
+            )
+            self.result = ResultHandlerResult.from_result_handler(
+                result_handler
+            )  # type: Optional[Result]
+        else:
+            self.result = result
 
         self.tasks = set()  # type: Set[Task]
         self.edges = set()  # type: Set[Edge]
@@ -181,7 +191,7 @@ class Flow:
 
         self._prefect_version = prefect.__version__
 
-        if state_handlers and not isinstance(state_handlers, collections.Sequence):
+        if state_handlers and not isinstance(state_handlers, collections.abc.Sequence):
             raise TypeError("state_handlers should be iterable.")
         self.state_handlers = state_handlers or []
         if on_failure is not None:
@@ -824,15 +834,19 @@ class Flow:
 
     # Execution  ---------------------------------------------------------------
 
-    def _run_on_schedule(
-        self, parameters: Dict[str, Any], runner_cls: type, **kwargs: Any
+    def _run(
+        self,
+        parameters: Dict[str, Any],
+        runner_cls: type,
+        run_on_schedule: bool = True,
+        **kwargs: Any
     ) -> "prefect.engine.state.State":
 
         base_parameters = parameters or dict()
 
         ## determine time of first run
         try:
-            if self.schedule is not None:
+            if run_on_schedule and self.schedule is not None:
                 next_run_event = self.schedule.next(1, return_events=True)[0]
                 next_run_time = next_run_event.start_time  # type: ignore
                 parameters = base_parameters.copy()
@@ -870,6 +884,8 @@ class Flow:
                     )
                 time.sleep(naptime)
 
+            error = False
+
             ## begin a single flow run
             while not flow_state.is_finished():
                 runner = runner_cls(flow=self)
@@ -881,8 +897,13 @@ class Flow:
                     context=flow_run_context,
                     **kwargs
                 )
-                if not isinstance(flow_state.result, dict):
-                    return flow_state  # something went wrong
+
+                # if flow_state is still scheduled; this most likely means
+                # that initialize_run failed (possibly due to a connection issue)
+                # and so we want to abort instead of creating an infinite loop
+                if not isinstance(flow_state.result, dict) or flow_state.is_scheduled():
+                    error = True
+                    break
 
                 task_states = list(flow_state.result.values())
                 for s in filter(lambda x: x.is_mapped(), task_states):
@@ -904,7 +925,7 @@ class Flow:
                 time.sleep(naptime)
 
             ## create next scheduled run
-            try:
+            if not error:
                 # update context cache
                 for t, s in flow_state.result.items():
                     if s.is_cached():
@@ -924,10 +945,13 @@ class Flow:
                         s
                         for s in prefect.context.caches.get(t.cache_key or t.name, [])
                         + cached_sub_states
-                        if s.cached_result_expiration > now
+                        if s.cached_result_expiration
+                        and s.cached_result_expiration > now
                     ]
                     prefect.context.caches[t.cache_key or t.name] = fresh_states
-                if self.schedule is not None:
+
+            try:
+                if run_on_schedule and self.schedule is not None:
                     next_run_event = self.schedule.next(1, return_events=True)[0]
                     next_run_time = next_run_event.start_time  # type: ignore
                     parameters = base_parameters.copy()
@@ -935,7 +959,9 @@ class Flow:
                 else:
                     break
             except IndexError:
+                # Handle when there are no more events on schedule
                 break
+
             flow_state = prefect.engine.state.Scheduled(
                 start_time=next_run_time, result={}
             )
@@ -1018,13 +1044,13 @@ class Flow:
 
         if run_on_schedule is None:
             run_on_schedule = cast(bool, prefect.config.flows.run_on_schedule)
-        if run_on_schedule is False:
-            runner = runner_cls(flow=self)
-            state = runner.run(parameters=parameters, return_tasks=self.tasks, **kwargs)
-        else:
-            state = self._run_on_schedule(
-                parameters=parameters, runner_cls=runner_cls, **kwargs
-            )
+
+        state = self._run(
+            parameters=parameters,
+            runner_cls=runner_cls,
+            run_on_schedule=run_on_schedule,
+            **kwargs
+        )
 
         # state always should return a dict of tasks. If it's NoResult (meaning the run was
         # interrupted before any tasks were executed), we set the dict manually.
@@ -1048,7 +1074,10 @@ class Flow:
     # Visualization ------------------------------------------------------------
 
     def visualize(
-        self, flow_state: "prefect.engine.state.State" = None, filename: str = None
+        self,
+        flow_state: "prefect.engine.state.State" = None,
+        filename: str = None,
+        format: str = None,
     ) -> object:
         """
         Creates graphviz object for representing the current flow; this graphviz
@@ -1060,6 +1089,8 @@ class Flow:
             - flow_state (State, optional): flow state object used to optionally color the nodes
             - filename (str, optional): a filename specifying a location to save this visualization to; if provided,
                 the visualization will not be rendered automatically
+            - format (str, optional): a format specifying the output file type; defaults to 'pdf'.
+              Refer to http://www.graphviz.org/doc/info/output.html for valid formats
 
         Raises:
             - ImportError: if `graphviz` is not installed
@@ -1167,7 +1198,7 @@ class Flow:
                 )
 
         if filename:
-            graph.render(filename, view=False)
+            graph.render(filename, view=False, format=format)
         else:
             try:
                 from IPython import get_ipython
@@ -1328,7 +1359,7 @@ class Flow:
             - build (bool, optional): if `True`, the flow's environment is built
                 prior to serialization; defaults to `True`
             - labels (List[str], optional): a list of labels to add to this Flow's environment; useful for
-                associating Flows with individual Agents; see http://docs.prefect.io/cloud/agents/overview.html#flow-affinity-labels
+                associating Flows with individual Agents; see http://docs.prefect.io/orchestration/agents/overview.html#flow-affinity-labels
             - set_schedule_active (bool, optional): if `False`, will set the
                 schedule to inactive in the database to prevent auto-scheduling runs (if the Flow has a schedule).
                 Defaults to `True`. This can be changed later.
@@ -1353,8 +1384,8 @@ class Flow:
             self.environment.labels.update(labels)
 
         # register the flow with a default result handler if one not provided
-        if not self.result_handler:
-            self.result_handler = self.storage.result_handler
+        if not self.result:
+            self.result = self.storage.result
 
         client = prefect.Client()
         registered_flow = client.register(

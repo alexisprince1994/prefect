@@ -1,5 +1,7 @@
+import datetime
 import json
 import logging
+import sys
 import time
 from unittest.mock import MagicMock
 
@@ -20,6 +22,20 @@ def test_root_logger_level_responds_to_config():
                 utilities.logging.configure_logging(testing=True).level
                 == logging.WARNING
             )
+    finally:
+        # reset root_logger
+        logger = utilities.logging.configure_logging(testing=True)
+        logger.handlers = []
+
+
+@pytest.mark.parametrize("datefmt", ["%Y", "%Y -- %D"])
+def test_root_logger_datefmt_responds_to_config(caplog, datefmt):
+    try:
+        with utilities.configuration.set_temporary_config({"logging.datefmt": datefmt}):
+            logger = utilities.logging.configure_logging(testing=True)
+            logger.error("badness")
+            logs = [r for r in caplog.records if r.levelname == "ERROR"]
+            assert logs[0].asctime == datetime.datetime.utcnow().strftime(datefmt)
     finally:
         # reset root_logger
         logger = utilities.logging.configure_logging(testing=True)
@@ -114,6 +130,32 @@ def test_remote_handler_captures_tracebacks(caplog, monkeypatch):
             assert '1 + "2"' in logged_msg
             assert "unexpected error" in logged_msg
 
+    finally:
+        # reset root_logger
+        logger = utilities.logging.configure_logging(testing=True)
+        logger.handlers = []
+
+
+def test_cloud_handler_formats_messages_and_removes_args(caplog, monkeypatch):
+    monkeypatch.setattr("prefect.client.Client", MagicMock)
+    client = MagicMock()
+    try:
+        with utilities.configuration.set_temporary_config(
+            {"logging.log_to_cloud": True}
+        ):
+            logger = utilities.logging.configure_logging(testing=True)
+            assert hasattr(logger.handlers[-1], "client")
+            logger.handlers[-1].client = client
+
+            child_logger = logger.getChild("sub-test")
+            child_logger.info("Here's a number: %d", 42)
+
+            time.sleep(0.75)
+
+            cloud_logs = client.write_run_logs.call_args[0][0]
+            assert len(cloud_logs) == 1
+            assert cloud_logs[0]["message"] == "Here's a number: 42"
+            assert "args" not in cloud_logs[0]["info"]
     finally:
         # reset root_logger
         logger = utilities.logging.configure_logging(testing=True)
@@ -295,6 +337,51 @@ def test_context_attributes():
     logger.filters.pop()
 
     assert test_filter.called
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Test randomly fails on Windows")
+def test_users_can_specify_additional_context_attributes(caplog):
+    items = {
+        "flow_run_id": "fri",
+        "flow_name": "fn",
+        "task_run_id": "tri",
+        "task_name": "tn",
+        "task_slug": "ts",
+        "trace_id": "ID",
+    }
+
+    with utilities.configuration.set_temporary_config(
+        {"logging.log_attributes": '["trace_id"]'}
+    ):
+        logger = logging.getLogger("test-logger")
+
+        with context(items):
+            logger.critical("log entry!")
+
+    assert caplog.records[0].trace_id == "ID"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Test randomly fails on Windows")
+def test_users_can_specify_additional_context_attributes_and_fails_gracefully(caplog):
+    items = {
+        "flow_run_id": "fri",
+        "flow_name": "fn",
+        "task_run_id": "tri",
+        "task_name": "tn",
+        "task_slug": "ts",
+        "trace_id": "ID",
+    }
+
+    with utilities.configuration.set_temporary_config(
+        {"logging.log_attributes": '["trace_id", "foo"]'}
+    ):
+        logger = logging.getLogger("test-logger")
+
+        with context(items):
+            logger.critical("log entry!")
+
+    assert caplog.records[0].foo is None
+    assert caplog.records[0].trace_id == "ID"
 
 
 def test_context_only_specified_attributes():

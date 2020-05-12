@@ -2,10 +2,6 @@
 
 [[toc]]
 
-::: warning Core server not supported, yet
-This environment is not currently supported with Prefect Core's server. Deployments using Prefect Core and Fargate will be added in a future release.
-:::
-
 ## Overview
 
 The Fargate Task Environment runs a Flow on a completely custom [Fargate Task](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/AWS_Fargate.html). This Environment is intended for use in cases where you want complete control over the Fargate Task your Flow runs on.
@@ -150,6 +146,7 @@ def output_value(value):
 flow = Flow(
     "Fargate Task Environment",
     environment=FargateTaskEnvironment(
+        launch_type="FARGATE",
         aws_session_token="MY_AWS_SESSION_TOKEN",
         region="us-east-1",
         cpu="256",

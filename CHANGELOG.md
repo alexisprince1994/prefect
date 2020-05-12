@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased release/0.11.0 <Badge text="beta" type="success"/>
+
+These changes are available in the [release/0.11.0 branch](https://github.com/PrefectHQ/prefect).
+
+### Features
+
+- None
+
+### Enhancements
+
+- None
+
+### Server
+
+- Add "cancellation-lite" semantic by preventing task runs from running if the flow run isn't running - [#2535](https://github.com/PrefectHQ/prefect/pull/2535)
+
+### Task Library
+
+- None
+
+### Fixes
+
+- Fix bug in Kubernetes agent ``deployment.yaml`` with a misconfigured liveness probe - [#2519](https://github.com/PrefectHQ/prefect/pull/2519)
+
+### Deprecations
+
+- None
+
+### Breaking Changes
+
+- Triggers now accept a dictionary of upstream edges and states instead of a set of states - [#2289](https://github.com/PrefectHQ/prefect/issues/2298)
+- Ensure all calls to `flow.run()` use the same execution logic - [#1994](https://github.com/PrefectHQ/prefect/pull/1994)
+- Moved `prefect.tasks.cloud` to `prefect.tasks.prefect` - [#2404](https://github.com/PrefectHQ/prefect/pull/2404)
+
+### Contributors
+
+- None
+
+# Changelog
+
 ## Unreleased <Badge text="beta" type="success"/>
 
 These changes are available in the [master branch](https://github.com/PrefectHQ/prefect).
@@ -10,7 +50,7 @@ These changes are available in the [master branch](https://github.com/PrefectHQ/
 
 ### Enhancements
 
-- None
+- `flow.visualize` is now able to accept a `format` argument to specify the output file type - [#2447](https://github.com/PrefectHQ/prefect/issues/2447)
 
 ### Task Library
 
@@ -30,7 +70,185 @@ These changes are available in the [master branch](https://github.com/PrefectHQ/
 
 ### Contributors
 
+- [Alvin Goh](https://github.com/chuehsien)
+
+## 0.10.7 <Badge text="beta" type="success"/>
+
+Released on May 6, 2020.
+
+### Features
+
 - None
+
+### Enhancements
+
+- Agents now support an optional HTTP health check, for use by their backing orchestration layer (e.g. k8s, docker, supervisord, ...) - [#2406](https://github.com/PrefectHQ/prefect/pull/2406)
+- Sets dask scheduler default to "threads" on LocalDaskExecutor to provide parallelism - [#2494](https://github.com/PrefectHQ/prefect/pull/2494)
+- Enhance agent verbose logs to include provided kwargs at start - [#2486](https://github.com/PrefectHQ/prefect/issues/2486)
+- Add `no_cloud_logs` option to all Agent classes for an easier way to disable sending logs to backend - [#2484](https://github.com/PrefectHQ/prefect/issues/2484)
+- Add option to set flow run environment variables on Kubernetes agent install - [#2424](https://github.com/PrefectHQ/prefect/issues/2424)
+
+### Task Library
+
+- Add new `case` control-flow construct, for nicer management of conditional tasks - [#2443](https://github.com/PrefectHQ/prefect/pull/2443)
+
+### Fixes
+
+- Give a better error for non-serializable callables when registering with cloud/server - [#2491](https://github.com/PrefectHQ/prefect/pull/2491)
+- Fix runners retrieving invalid `context.caches` on runs started directly from a flow runner - [#2403](https://github.com/PrefectHQ/prefect/issues/2403)
+
+### Deprecations
+
+- None
+
+### Breaking Changes
+
+- Remove the Nomad agent - [#2492](https://github.com/PrefectHQ/prefect/pull/2492)
+
+### Contributors
+
+- None
+
+## 0.10.6 <Badge text="beta" type="success"/>
+
+Released on May 5, 2020.
+
+### Features
+
+- Add DaskCloudProviderEnvironment to dynamically launch Dask clusters, e.g. on AWS Fargate - [#2360](https://github.com/PrefectHQ/prefect/pull/2360)
+
+### Enhancements
+
+- Add `botocore_config` option to Fargate agent for setting botocore configuration when interacting with boto3 client - [#2170](https://github.com/PrefectHQ/prefect/issues/2170)
+- Don't create a `None` task for a null condition when using `ifelse` - [#2449](https://github.com/PrefectHQ/prefect/pull/2449)
+- Add support for EC2 launch type in Fargate Agent and `FargateTaskEnvironment` - [#2421](https://github.com/PrefectHQ/prefect/pull/2421)
+- Add `flow_id` to context for Flow runs - [#2461](https://github.com/PrefectHQ/prefect/pull/2461)
+- Allow users to inject custom context variables into their logger formats - [#2462](https://github.com/PrefectHQ/prefect/issues/2462)
+- Add option to set backend on `agent install` CLI command - [#2478](https://github.com/PrefectHQ/prefect/pull/2478)
+
+### Task Library
+
+- None
+
+### Fixes
+
+- Fix `start_server.sh` script when an env var is undefined - [#2450](https://github.com/PrefectHQ/prefect/pull/2450)
+- Fix `server start` CLI command not respecting `version` kwarg on tagged releases - [#2435](https://github.com/PrefectHQ/prefect/pull/2435)
+- Fix issue with non-JSON serializable args being used to format log messages preventing them from shipping to Cloud - [#2407](https://github.com/PrefectHQ/prefect/issues/2407)
+- Fix issue where ordered Prefect collections use lexical sorting, not numerical sorting, which can result in unexpected ordering - [#2452](https://github.com/PrefectHQ/prefect/pull/2452)
+- Fix issue where Resource Manager was failing due to non-JSON timestamp in log writing - [#2474](https://github.com/PrefectHQ/prefect/issues/2474)
+- Fix periodic error in local agent process management loop - [#2419](https://github.com/PrefectHQ/prefect/issues/2419)
+
+### Deprecations
+
+- None
+
+### Breaking Changes
+
+- None
+
+### Contributors
+
+- [Grégory Duchatelet](https://github.com/gregorg)
+- [Joe Schmid](https://github.com/joeschmid)
+
+## 0.10.5 <Badge text="beta" type="success"/>
+
+Released on Apr 28, 2020.
+
+### Features
+
+- None
+
+### Enhancements
+
+- Added serializer for `RemoteDaskEnvironment` - [#2369](https://github.com/PrefectHQ/prefect/issues/2369)
+- `server start` CLI command now defaults to image build based on current Prefect installation version - [#2375](https://github.com/PrefectHQ/prefect/issues/2375)
+- Add option to set `executor_kwargs` on `KubernetesJobEnvironment` and `FargateTaskEnvironment` - [#2258](https://github.com/PrefectHQ/prefect/issues/2258)
+- Add map index to task logs for mapped task runs - [#2402](https://github.com/PrefectHQ/prefect/pull/2402)
+- Agents can now register themselves with Cloud for better management - [#2312](https://github.com/PrefectHQ/prefect/issues/2312)
+- Adding support for `environment`, `secrets`, and `mountPoints` via configurable `containerDefinitions` to the Fargate Agent - [#2397](https://github.com/PrefectHQ/prefect/pull/2397)
+- Add flag for disabling Docker agent interface check on Linux - [#2361](https://github.com/PrefectHQ/prefect/issues/2361)
+
+### Task Library
+
+- Add Pushbullet notification task to send notifications to mobile - [#2366](https://github.com/PrefectHQ/prefect/pull/2366)
+- Add support for Docker volumes and filtering in `prefect.tasks.docker` - [#2384](https://github.com/PrefectHQ/prefect/pull/2384)
+
+### Fixes
+
+- Fix Docker storage path issue when registering flows on Windows machines - [#2332](https://github.com/PrefectHQ/prefect/issues/2332)
+- Fix issue with refreshing Prefect Cloud tokens - [#2409](https://github.com/PrefectHQ/prefect/pull/2409)
+- Resolve invalid escape sequence deprecation warnings - [#2414](https://github.com/PrefectHQ/prefect/issues/2414)
+
+### Deprecations
+
+- None
+
+### Breaking Changes
+
+- None
+
+### Contributors
+
+- [Nelson Cornet](https://github.com/sk4la)
+- [Braun Reyes](https://github.com/braunreyes)
+- [Fraznist](https://github.com/Fraznist)
+- [sk4la](https://github.com/sk4la)
+- [Troy Köhler](https://github.com/trkohler)
+
+## 0.10.4 <Badge text="beta" type="success"/>
+
+Released on Apr 21, 2020.
+
+### Enhancements
+
+- Agent connection step shows which endpoint it is connected to and checks API connectivity - [#2372](https://github.com/PrefectHQ/prefect/pull/2372)
+
+### Breaking Changes
+
+- Revert changes to `ifelse` & `switch` (added in [#2310](https://github.com/PrefectHQ/prefect/pull/2310)), removing implicit
+  creation of `merge` tasks - [#2379](https://github.com/PrefectHQ/prefect/pull/2379)
+
+## 0.10.3 <Badge text="beta" type="success"/>
+
+Released on Apr 21, 2020.
+
+### Features
+
+- None
+
+### Enhancements
+
+- Allow GraphQL endpoint configuration via `config.toml` for remote deployments of the UI - [#2338](https://github.com/PrefectHQ/prefect/pull/2338)
+- Add option to connect containers created by Docker agent to an existing Docker network - [#2334](https://github.com/PrefectHQ/prefect/pull/2334)
+- Expose `datefmt` as a configurable logging option in Prefect configuration - [#2340](https://github.com/PrefectHQ/prefect/pull/2340)
+- The Docker agent configures containers to auto-remove on completion - [#2347](https://github.com/PrefectHQ/prefect/pull/2347)
+- Use YAML's safe load and dump commands for the `server start` CLI command - [#2352](https://github.com/PrefectHQ/prefect/pull/2352)
+- New `RemoteDaskEnvironment` specifically for running Flows on an existing Dask cluster - [#2367](https://github.com/PrefectHQ/prefect/pull/2367)
+
+### Task Library
+
+- None
+
+### Fixes
+
+- Fix `auth create-token` CLI command specifying deprecated `role` instead of `scope` - [#2336](https://github.com/PrefectHQ/prefect/issues/2336)
+- Fix local schedules not continuing to schedule on errors outside of runner's control - [#2133](https://github.com/PrefectHQ/prefect/issues/2133)
+- Fix `get_latest_cached_states` pulling incorrect upstream cached states when using Core server as the backend - [#2343](https://github.com/PrefectHQ/prefect/issues/2343)
+
+### Deprecations
+
+- None
+
+### Breaking Changes
+
+- None
+
+### Contributors
+
+- [Brad McElroy](https://github.com/limx0)
+- [Joe Schmid](https://github.com/joeschmid)
 
 ## 0.10.2 <Badge text="beta" type="success"/>
 
