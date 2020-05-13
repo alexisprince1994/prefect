@@ -10,6 +10,10 @@ debug = false
 # the max number of runs returned by get_runs_in_queue
 queued_runs_returned_limit = 25
 
+# Enable / Disable plugins
+[contrib]
+    [contrib.flow_concurrency]
+    enabled = false
 
 [database]
 

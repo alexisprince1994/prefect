@@ -15,6 +15,7 @@ from prefect.engine.state import Failed, Queued, Running, State
 from prefect.utilities.graphql import EnumValue, with_args
 
 from prefect_server import api, config
+from prefect_server.contrib import api as contrib_api
 from prefect_server.database import hasura, models
 from prefect_server.utilities.logging import get_logger
 
@@ -27,9 +28,10 @@ async def set_flow_run_state(flow_run_id: str, state: State) -> None:
     """
     Updates a flow run state.
 
-    If the flow's execution environment has a flow concurrency limit,
-    this is the location that is ultimately responsible for ensuring
-    no more than the allowed limit are `Running` at once.
+    If the `flow_concurrency` plugin is enabled and the flow's execution 
+    environment has a flow concurrency limit, this is the location that 
+    is ultimately responsible for ensuring no more than the 
+    allowed limit are `Running` at once.
 
     Args:
         - flow_run_id (str): the flow run id to update
@@ -60,27 +62,30 @@ async def set_flow_run_state(flow_run_id: str, state: State) -> None:
     if not flow_run:
         raise ValueError(f"Invalid flow run ID: {flow_run_id}.")
 
-    # TODO: Figure out how to deal w/ feature flagging and only
-    # do the concurrency check when there plugin is enabled
-    if isinstance(state, Running):
-        # Check whether the environment is concurrency constrained
-        # or not.
-        execution_env_labels = flow_run.flow.environment.get("labels")
-        if execution_env_labels:
-            limits = await api.concurrency_limits.get_available_flow_concurrency(
-                execution_env_labels
-            )
-
-            # At least one environment doesn't have the required concurrency slot
-            if not all([limits.get(label, 1) > 0 for label in execution_env_labels]):
-
-                # More details for better logging
-                unavailable_slots = [limit for limit in limits.values() if limit > 0]
-
-                raise ValueError(
-                    f"Unable to set flow run state to Running due \
-                        to concurrency limit on environments: {unavailable_slots}"
+    if config.contrib.flow_concurrency.enabled:
+        if isinstance(state, Running):
+            # Check whether the environment is concurrency constrained
+            # or not.
+            execution_env_labels = flow_run.flow.environment.get("labels")
+            if execution_env_labels:
+                limits = await contrib_api.concurrency_limits.get_available_flow_concurrency(
+                    execution_env_labels
                 )
+
+                # At least one environment doesn't have the required concurrency slot
+                if not all(
+                    [limits.get(label, 1) > 0 for label in execution_env_labels]
+                ):
+
+                    # More details for better logging
+                    unavailable_slots = [
+                        limit for limit in limits.values() if limit > 0
+                    ]
+
+                    raise ValueError(
+                        f"Unable to set flow run state to Running due \
+                            to concurrency limit on environments: {unavailable_slots}"
+                    )
 
     # --------------------------------------------------------
     # insert the new state in the database

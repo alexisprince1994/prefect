@@ -246,32 +246,3 @@ async def excess_submitted_task_runs():
             flow_run_id=flow_run, task_id=task.id, map_index=None
         )
         await api.states.set_task_run_state(task_run_id=task_run, state=Submitted())
-
-
-@pytest.fixture
-async def flow_concurrency_limit() -> models.FlowConcurrencyLimit:
-
-    concurrency_limit_id = await api.concurrency_limits.create_flow_concurrency_limit(
-        "foo",
-        description="A flow concurrency limit created from Prefect Server's test suite.",
-        limit=1,
-    )
-
-    populated_concurrency_limit = await models.FlowConcurrencyLimit.where(
-        id=concurrency_limit_id
-    ).first({"id", "name", "description", "limit"})
-    return populated_concurrency_limit
-
-
-@pytest.fixture
-async def flow_concurrency_limit_2() -> models.FlowConcurrencyLimit:
-    concurrency_limit_id = await api.concurrency_limits.create_flow_concurrency_limit(
-        "bar",
-        description="A second flow concurrency limit created from Prefect Server's test suite",
-        limit=1,
-    )
-
-    populated_concurrency_limit = await models.FlowConcurrencyLimit.where(
-        id=concurrency_limit_id
-    ).first({"id", "name", "description", "limit"})
-    return populated_concurrency_limit

@@ -20,6 +20,7 @@ import prefect
 from prefect.engine.state import Finished, Running
 from prefect.utilities.graphql import with_args
 
+from prefect_server.contrib.database import models as contrib_models
 from prefect_server.database import models
 
 RUNNING_STATES = [
@@ -56,7 +57,7 @@ async def create_flow_concurrency_limit(
                 Expected > 0 for being able to limit runs properly."
         )
 
-    flow_concurrency_limit_id = await models.FlowConcurrencyLimit(
+    flow_concurrency_limit_id = await contrib_models.FlowConcurrencyLimit(
         name=name, limit=limit, description=description
     ).insert()
 
@@ -75,7 +76,7 @@ async def delete_flow_concurrency_limit(flow_concurrency_limit_id: str) -> bool:
         - bool: Whether the delete was succcessful.
     """
 
-    result = await models.FlowConcurrencyLimit.where(
+    result = await contrib_models.FlowConcurrencyLimit.where(
         id=flow_concurrency_limit_id
     ).delete()
     return bool(result.affected_rows)

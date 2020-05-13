@@ -14,6 +14,7 @@ from prefect.utilities.graphql import EnumValue, parse_graphql_arguments, with_a
 
 import prefect_server
 from prefect_server import api, config
+from prefect_server.contrib import api as contrib_api
 from prefect_server.database import hasura, models
 from prefect_server.utilities import exceptions, names
 
@@ -241,9 +242,12 @@ async def get_runs_in_queue(
     # but this mapping likely won't contain all labels
     # we pass in.
 
-    available_concurrency_slots = await api.concurrency_limits.get_available_flow_concurrency(
-        list(concurrency_limits)
-    )
+    if config.contrib.flow_concurrency.enabled:
+        available_concurrency_slots = await contrib_api.concurrency_limits.get_available_flow_concurrency(
+            list(concurrency_limits)
+        )
+    else:
+        available_concurrency_slots = {}
 
     counter = 0
     final_flow_runs = []
@@ -271,29 +275,30 @@ async def get_runs_in_queue(
         if not run_labels and labels:
             continue
 
-        # Flow concurrency filtering
-        # Required concurrency slots of this flow run
-        if run_labels:
+        if config.contrib.flow_concurrency.enabled:
+            # Flow concurrency filtering
+            # Required concurrency slots of this flow run
+            if run_labels:
 
-            # Unconstrained environments won't be in the dict, so
-            # defaulting to 1 to make sure they pass the test.
-            if not all(
-                [
-                    available_concurrency_slots.get(concurrency_limit, 1) > 0
-                    for concurrency_limit in run_labels
-                ]
-            ):
+                # Unconstrained environments won't be in the dict, so
+                # defaulting to 1 to make sure they pass the test.
+                if not all(
+                    [
+                        available_concurrency_slots.get(concurrency_limit, 1) > 0
+                        for concurrency_limit in run_labels
+                    ]
+                ):
 
-                # The environment doesn't have the available concurrency slots, so we
-                # bail early and don't count towards the number in the queue.
+                    # The environment doesn't have the available concurrency slots, so we
+                    # bail early and don't count towards the number in the queue.
 
-                continue
-            else:
-                for used_slot in run_labels:
-                    # Env labels don't need to be constrained, so we only
-                    # decrement if they are constrained.
-                    if used_slot in available_concurrency_slots:
-                        available_concurrency_slots[used_slot] -= 1
+                    continue
+                else:
+                    for used_slot in run_labels:
+                        # Env labels don't need to be constrained, so we only
+                        # decrement if they are constrained.
+                        if used_slot in available_concurrency_slots:
+                            available_concurrency_slots[used_slot] -= 1
 
         final_flow_runs.append(flow_run.id)
         counter += 1
